@@ -1,16 +1,32 @@
 # OlyAI Office — Server Installation
 
-Trợ lý AI nội bộ chạy trên server của bạn. Backend + LLM (vLLM) + PostgreSQL + pgvector + Redis + Ollama (embeddings).
+Internal AI assistant. Backend runs as a **binary** (no Python/pip required). LLM (vLLM) runs on a separate server.
 
-## Yêu cầu
+## Architecture
 
-- **OS**: Ubuntu 22.04+ / Debian 12+ / Rocky/RHEL 9+
-- **GPU**: NVIDIA với CUDA (tối thiểu 1x GPU 24GB cho Qwen 7B, 2x GPU 80GB+ cho Qwen 32B)
-- **RAM**: 64GB+
-- **Disk**: 200GB+ SSD (model weights ~80GB)
-- **Quyền**: root hoặc sudo
+```
+┌─────────────────────┐       ┌──────────────────────┐
+│  Backend Server     │       │  LLM Server          │
+│  (this server)      │ ────▶ │  (separate, GPU)     │
+│                     │       │                      │
+│  - olyai-backend    │       │  - vLLM              │
+│  - PostgreSQL       │       │  - Ollama (embed)    │
+│  - Redis            │       │                      │
+└─────────────────────┘       └──────────────────────┘
+```
 
-## Cài đặt nhanh (1 lệnh)
+## Requirements
+
+**Backend server** (this server):
+- OS: Ubuntu 22.04+ / Debian 12+ / Rocky/RHEL 9+
+- x86_64 architecture
+- 4GB RAM, 20GB disk
+
+**LLM server** (separate, with GPU):
+- vLLM or Ollama exposing an OpenAI-compatible API
+- Default endpoint: `http://your-llm-server:8001/v1`
+
+## Quick install (1 command)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/openlay/oly-ai-office-release/main/olyai.sh -o olyai.sh \
@@ -18,159 +34,144 @@ curl -fsSL https://raw.githubusercontent.com/openlay/oly-ai-office-release/main/
   && sudo bash olyai.sh install
 ```
 
-Script tự động:
-1. Cài PostgreSQL + pgvector + Redis + Ollama + MongoDB
-2. Clone backend code từ release repo vào `/opt/oly-ai-office`
-3. Tạo Python venv, cài dependencies
-4. Setup systemd services: `olyai`, `vllm`, `vllm-7b`
-5. Chạy database migrations
-6. Khởi động backend API trên port 8000
+The script automatically:
+1. Installs PostgreSQL + pgvector + Redis
+2. Downloads the `olyai-backend` binary into `/opt/oly-ai-office/`
+3. Creates `.env` with default config
+4. Runs database migrations
+5. Starts the systemd service on port 8000
 
-## Sau khi cài xong
+## Configure the LLM server
 
-### Bước 1: Khởi động LLM servers
+After install, edit `/opt/oly-ai-office/.env`:
 
 ```bash
-# vLLM Qwen 32B (sẽ tự download ~65GB, mất 30-60 phút lần đầu)
-sudo systemctl start vllm
-
-# vLLM Qwen 7B (~15GB)
-sudo systemctl start vllm-7b
-
-# Theo dõi tiến trình
-sudo journalctl -u vllm -f
+sudo nano /opt/oly-ai-office/.env
 ```
 
-### Bước 2: Kiểm tra
+Update URLs:
+```env
+OLLAMA_BASE_URL=http://your-llm-server:8001/v1   # vLLM endpoint
+EMBEDDING_BASE_URL=http://your-llm-server:11434  # Ollama for embeddings
+```
+
+Restart:
+```bash
+sudo systemctl restart olyai
+```
+
+## Test
 
 ```bash
 # Health check
 curl http://localhost:8000/health
 
-# Backend API docs
+# API docs
 open http://YOUR_SERVER_IP:8000/docs
-
-# Test chat (sau khi vLLM sẵn sàng)
-curl http://localhost:8001/v1/models
 ```
 
-### Bước 3: Kết nối từ Mac/iOS app
+## Connect from Mac/iOS app
 
-Mở app **OlyAI Office** → Workspace picker → nhập URL server:
+Open **OlyAI Office** app → Workspace picker → enter:
 ```
 http://YOUR_SERVER_IP:8000
 ```
-Đăng ký tài khoản và sử dụng.
 
-## Cấu hình ports
+## Update
 
-| Port | Service | Mô tả |
-|------|---------|-------|
-| 8000 | Backend API | FastAPI (chat, contexts, documents, ...) |
-| 8001 | vLLM 32B | Qwen 2.5 32B Instruct |
-| 8002 | vLLM 7B | Qwen 2.5 7B Instruct |
-| 11434 | Ollama | Embeddings (nomic-embed-text) |
-| 5432 | PostgreSQL | Database |
-| 6379 | Redis | Cache/queue |
-| 27017 | MongoDB | (Tuỳ chọn) Datasource |
+```bash
+sudo bash olyai.sh update
+```
 
-Mở firewall cho port 8000:
+The script:
+1. Downloads the latest binary
+2. Runs new migrations (if any)
+3. Restarts the service
+
+## Management commands
+
+```bash
+sudo systemctl status olyai
+sudo systemctl restart olyai
+sudo journalctl -u olyai -f         # Real-time log
+sudo journalctl -u olyai -n 100     # Last 100 log lines
+```
+
+## Ports
+
+| Port | Service |
+|------|---------|
+| 8000 | Backend API (olyai-backend) |
+| 5432 | PostgreSQL |
+| 6379 | Redis |
+
+Open firewall for the API:
 ```bash
 sudo ufw allow 8000
 ```
 
-## Update lên phiên bản mới
+## Directory structure
 
-```bash
-sudo bash olyai.sh update
 ```
+/opt/oly-ai-office/
+├── olyai-backend        # Binary executable (~80MB)
+├── .env                 # Config
+└── uploads/             # Uploaded documents
 
-Script tự động:
-- Pull code mới từ GitHub release repo
-- Sync vào `/opt/oly-ai-office/backend`
-- Chạy migrations mới (nếu có)
-- Restart backend
-
-## Lệnh quản lý
-
-```bash
-# Status
-sudo systemctl status olyai vllm vllm-7b
-
-# Restart
-sudo systemctl restart olyai
-
-# Logs
-sudo journalctl -u olyai -f      # Backend
-sudo journalctl -u vllm -f        # vLLM 32B
-sudo journalctl -u vllm-7b -f     # vLLM 7B
-
-# Database
-sudo -u postgres psql olyai
+/etc/systemd/system/
+└── olyai.service        # Systemd unit
 ```
-
-## Thêm model DeepSeek V3 670B (tuỳ chọn)
-
-Nếu có GPU ≥ 4x H100/H200:
-
-```bash
-# Cần ~380GB VRAM hoặc quantization TQ1_0 (~170GB)
-ollama pull hf.co/unsloth/DeepSeek-V3.1-GGUF:TQ1_0
-```
-
-Sau đó thêm custom model qua app Settings → Thêm model:
-- Server URL: `http://localhost:11434/v1`
-- Model name: `hf.co/unsloth/DeepSeek-V3.1-GGUF:TQ1_0`
 
 ## Troubleshooting
 
-### vLLM không start
-```bash
-# Kiểm tra GPU free memory
-nvidia-smi
-
-# Nếu GPU bị chiếm, giảm gpu-memory-utilization trong
-# /etc/systemd/system/vllm.service
-```
-
-### Backend lỗi 500
+### Service fails to start
 ```bash
 sudo journalctl -u olyai -n 50 --no-pager
 ```
 
-### Port conflict
+### Port 8000 in use
 ```bash
-sudo lsof -i :8000    # Tìm process đang chiếm port
+sudo lsof -i :8000
 ```
 
-### Reset database (cẩn thận - mất data!)
+### Reset database (careful!)
 ```bash
 sudo -u postgres psql -c "DROP DATABASE olyai;"
 sudo -u postgres psql -c "CREATE DATABASE olyai;"
-sudo bash olyai.sh update
+sudo -u postgres psql -d olyai -c "CREATE EXTENSION vector;"
+cd /opt/oly-ai-office && ./olyai-backend --run-migrations
+sudo systemctl restart olyai
 ```
 
-## Cấu trúc thư mục
-
+### Cannot connect to LLM
+Verify the endpoint in `.env`:
+```bash
+curl http://your-llm-server:8001/v1/models
 ```
-/opt/oly-ai-office/
-├── backend/              # FastAPI code
-│   ├── app/              # Application code
-│   ├── alembic/          # Database migrations
-│   ├── .venv/            # Python virtualenv
-│   └── .env              # Config (DATABASE_URL, SECRET_KEY, ...)
-└── uploads/              # Uploaded documents
 
-/etc/systemd/system/
-├── olyai.service         # Backend
-├── vllm.service          # Qwen 32B
-└── vllm-7b.service       # Qwen 7B
+## LLM server setup (reference)
+
+On a separate GPU server, install vLLM:
+
+```bash
+# vLLM Qwen 32B (requires 2x GPU 80GB+)
+pip install vllm
+python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-32B-Instruct \
+  --served-model-name olyai-fast \
+  --tensor-parallel-size 2 \
+  --max-model-len 32768 \
+  --port 8001
+
+# Ollama for embeddings
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull nomic-embed-text
 ```
 
 ## License
 
-Internal use only — not for redistribution.
+Internal use only.
 
-## Hỗ trợ
+## Support
 
 Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
