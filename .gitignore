@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+.env.local
+uploads/
+*.log
+.DS_Store
+.pytest_cache/
+.vscode/
+.idea/
+test_ui*.py
+test_full.py
+test_chat.py
