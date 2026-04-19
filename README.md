@@ -2,6 +2,8 @@
 
 Internal AI assistant. Backend runs as a **binary** (no Python/pip required). LLM (vLLM) runs on a separate server.
 
+**Current release: v1.1.0** — see [CHANGELOG](#changelog) below.
+
 ## Architecture
 
 ```
@@ -175,3 +177,32 @@ Internal use only.
 ## Support
 
 Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
+
+## Changelog
+
+### v1.1.0 (2026-04-19)
+
+**New features:**
+- **Deep Research** — multi-step AI research agent. Toggle 🔬 in chat → planner breaks question into sub-questions → tool loop (web_search + fetch_url + query_database + search_documents) → synthesizes Markdown report with `[^N]` citations.
+- **Default model auto-seed** — new users automatically get `olyai-fast`, `olyai-dev`, `olyai-deepseek` without manual setup. Seeded from `app/services/model_seed.py` on registration.
+- **Preflight model check** — before starting research, backend pings the selected model. If unreachable, returns a clear error: `"⚠️ Model 'X' KHÔNG HOẠT ĐỘNG — server tại ... đang TẮT (cổng không mở). Hãy chọn model khác..."` instead of triple-erroring through planning + step + synthesis.
+- **Conversation context for follow-ups** — follow-up research questions like "lập báo cáo từng tháng" after an oil-price research now reuse prior subject instead of generating generic plans.
+- **Report copy** — research bubble has a "Copy" pill + right-click menu (Copy report / Copy with sources / Copy sources only).
+
+**Bug fixes:**
+- Fixed `GET /messages` returning 500 for conversations with research metadata — was caused by Pydantic `alias="metadata"` + `populate_by_name` reading SQLAlchemy's built-in `MetaData` registry instead of the `metadata_` column.
+- Fixed assistant message not persisting after research — `sse_starlette` cancels the generator after the last `yield`, so save logic must run before yielding the final `done` event.
+- Fixed Swift SSE parser getting stuck at "Các bước (0)" — `URLSessionAsyncBytes.lines` splits on `\n` only, so CRLF frame separators appear as `"\r"` strings, not empty. Parser now strips trailing `\r`.
+- Fixed error banner ("Could not connect to the server") persisting across chat switches — `ChatViewModel.setConversation()` now clears `errorMessage` and `researchLive`.
+- Fixed ResearchBubble disappearing on error — now retains the bubble with a red error banner inside, showing partial plan/steps if any.
+- Fixed `POST /api/v1/models` returning 500 on missing fields — now validates via Pydantic `CustomModelCreate` → 422 with detail.
+- Fixed `get_client_for_model` failing with "Multiple rows" when multiple users have the same model_id — query now scopes by `user_id`.
+
+**Testing:**
+- New `backend/tests/testcase.md` — 140-case specification document in Vietnamese
+- New `backend/run_testcases.py` — standalone runner with per-case report, `--priority P0` smoke mode, `--markdown` export
+- New `backend/tests/` pytest suite — 34 cases across 8 files (metadata, SSE format, persistence, context, preflight, errors, model seed, long conversation)
+
+### v1.0.2
+
+Initial binary release.
