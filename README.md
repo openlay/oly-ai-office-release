@@ -2,7 +2,7 @@
 
 Internal AI assistant. Backend runs as a **binary** (no Python/pip required). LLM (vLLM) runs on a separate server.
 
-**Current release: v1.1.0** — see [CHANGELOG](#changelog) below.
+**Current release: v1.2.0** — see [CHANGELOG](#changelog) below.
 
 ## Architecture
 
@@ -179,6 +179,30 @@ Internal use only.
 Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
+
+### v1.2.0 (2026-04-20)
+
+**New features:**
+- **Google Sheets API — configure once in Settings.** New section in Settings to paste the service-account JSON one time; all Google Sheets datasources automatically share those credentials. No more copy-pasting the JSON into every datasource form. Service account email is displayed prominently so you know which address to share the sheet with.
+- **Add Google Sheets datasource simplified.** The form now asks only for the sheet ID or URL — you can paste the full `https://docs.google.com/spreadsheets/d/.../edit#gid=0` link and the app extracts the ID automatically (both client-side and server-side as a safety net). The form also displays the service-account email with a one-click Copy button.
+- **New `user_settings` table.** Per-user global settings (currently only Google service-account JSON, extensible to other API keys in the future). Auto-created on backend startup via `Base.metadata.create_all`.
+- **Anti-hallucination on database tool failure.** When a `query_database` call fails (sheet not found, permission denied, etc.), the tool response now explicitly lists available tables/sheets and instructs the LLM not to fabricate data. Previously the AI would invent plausible numbers when it couldn't read the sheet.
+
+**Bug fixes:**
+- Fixed `sqlalchemy.exc.InvalidRequestError: A transaction is already begun on this Session` when querying Google Sheets mid-chat — `resolve_google_credentials` now uses a fresh DB session instead of reusing the request's active session.
+- Fixed `POST /api/v1/models` returning 500 on missing fields — now validates via Pydantic `CustomModelCreate` → 422 with detail.
+- Fixed stale signing settings (`DEVELOPMENT_TEAM = <team>`) being written into `apple/OlyAI.xcodeproj/project.pbxproj` every time a dev with a different Apple ID opened Xcode. Moved signing config to xcconfig files so pbxproj stays clean across machines.
+- Fixed `build_cli.sh` leaving a stripped `project.pbxproj` on disk if the build failed or was interrupted (`trap` now always restores the backup).
+- Added `.gitattributes` with `merge=union` for `project.pbxproj` to reduce merge conflicts when multiple devs add files simultaneously.
+
+**API additions:**
+- `GET /api/v1/user-settings` — returns `{google_service_account: {configured, client_email}}` with secrets masked.
+- `PUT /api/v1/user-settings/google-service-account` — body `{credentials_json}`; validates JSON is a `service_account` with `client_email`.
+- `DELETE /api/v1/user-settings/google-service-account` — clears stored credentials.
+
+**Internal:**
+- Added `backend/run_testcases.py` improvements — now 50 auto-run test cases including 9 new tests for `/api/v1/user-settings` and Google Sheets URL auto-extract.
+- `backend/tests/testcase.md` — test-case specification expanded.
 
 ### v1.1.0 (2026-04-19)
 
