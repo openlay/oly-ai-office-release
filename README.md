@@ -201,6 +201,13 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.1 (2026-04-27)
+
+**Bug fixes (hotfix v1.3.0):**
+- **Auto-migrate DB schema on startup.** v1.3.0 added `documents.raw_content` column but `Base.metadata.create_all` only creates tables, not columns. Existing deployments crashed with `column "raw_content" does not exist` on first call to `/documents`. Backend now runs idempotent `ALTER TABLE IF EXISTS … ADD COLUMN IF NOT EXISTS …` on every startup; future column additions self-upgrade.
+- **Graceful embedding-service failure.** Document creation no longer 500s when the embedding service (Ollama nomic-embed-text) is unreachable. Document is saved with chunks but `embedding=NULL`; `error_message` flags the partial state. Vector search misses these chunks until re-indexed, but content is preserved and usable.
+- **Test Summary model picker.** Editor's "Test Summary" + Save now accept a model. Backend auto-picks `olyai-fast → olyai-dev → first active custom_model` if not specified. Returns 400 with helpful message if user has no models. UI shows a model dropdown next to the Test Summary button (default = lastModel from Chat).
+
 ### v1.3.0 (2026-04-27)
 
 **New features:**
