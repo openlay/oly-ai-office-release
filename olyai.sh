@@ -85,6 +85,39 @@ setup_redis() {
     log "Redis ready"
 }
 
+setup_ollama_embedding() {
+    header "Ollama (for document embeddings)"
+    if command -v ollama >/dev/null 2>&1; then
+        log "Ollama already installed: $(ollama --version 2>&1 | head -1)"
+    else
+        warn "Installing Ollama..."
+        curl -fsSL https://ollama.com/install.sh | sh 2>&1 | tail -3
+        log "Ollama installed"
+    fi
+
+    # Make sure service is running (install script usually does this on systemd hosts)
+    systemctl enable ollama 2>/dev/null || true
+    systemctl start ollama 2>/dev/null || true
+    sleep 2
+
+    # Wait up to 30s for the API to be ready
+    for i in {1..15}; do
+        if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+            break
+        fi
+        sleep 2
+    done
+
+    # Pull the embedding model (idempotent — skips if already present)
+    if curl -sf http://localhost:11434/api/tags 2>/dev/null | grep -q nomic-embed-text; then
+        log "nomic-embed-text already pulled"
+    else
+        warn "Pulling nomic-embed-text (~270MB, one-time)..."
+        ollama pull nomic-embed-text 2>&1 | tail -3
+        log "nomic-embed-text ready"
+    fi
+}
+
 download_binary() {
     header "Download OlyAI binary"
     mkdir -p "$APP_DIR"
@@ -160,6 +193,7 @@ do_install() {
     install_system_deps
     setup_postgres
     setup_redis
+    setup_ollama_embedding
     download_binary
     setup_env
     run_migrations

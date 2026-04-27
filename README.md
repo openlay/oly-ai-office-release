@@ -32,21 +32,27 @@ App runs on: **macOS 14.0+** (Sonoma), Intel + Apple Silicon. Ad-hoc signed (no 
 │  Backend Server     │       │  LLM Server          │
 │  (this server)      │ ────▶ │  (separate, GPU)     │
 │                     │       │                      │
-│  - olyai-backend    │       │  - vLLM              │
-│  - PostgreSQL       │       │  - Ollama (embed)    │
-│  - Redis            │       │                      │
-└─────────────────────┘       └──────────────────────┘
+│  - olyai-backend    │       │  - vLLM (chat)       │
+│  - PostgreSQL       │       │                      │
+│  - Redis            │       └──────────────────────┘
+│  - Ollama (embed)   │
+└─────────────────────┘
 ```
+
+The install script puts **Ollama on the backend server** (not the LLM server)
+because embedding is done locally on small CPU model `nomic-embed-text` —
+keeps document upload latency low and avoids network round-trips for every
+RAG query. The remote LLM server only does chat completion.
 
 ## Requirements
 
 **Backend server** (this server):
 - OS: Ubuntu 22.04+ / Debian 12+ / Rocky/RHEL 9+
 - x86_64 architecture
-- 4GB RAM, 20GB disk
+- 4GB RAM, 20GB disk (Ollama + nomic-embed-text adds ~300MB)
 
-**LLM server** (separate, with GPU):
-- vLLM or Ollama exposing an OpenAI-compatible API
+**LLM server** (separate, with GPU — for chat):
+- vLLM exposing an OpenAI-compatible API
 - Default endpoint: `http://your-llm-server:8001/v1`
 
 ## Quick install (1 command)
@@ -200,6 +206,13 @@ Internal use only.
 Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
+
+### v1.3.5 (2026-04-27)
+
+**Setup script auto-installs Ollama embedding service.**
+- `olyai.sh install` now runs `setup_ollama_embedding`: installs Ollama (if missing) + pulls `nomic-embed-text` (~270 MB, one-time) + enables the systemd unit. Vector search works out of the box on a fresh server, no manual SSH steps.
+- Existing installs: re-run `sudo bash olyai.sh install` (idempotent — skips Postgres/Redis if already there, just adds Ollama).
+- Architecture clarified in README: Ollama lives on the backend server (CPU-friendly small embedding model), not the GPU LLM server.
 
 ### v1.3.4 (2026-04-27)
 
