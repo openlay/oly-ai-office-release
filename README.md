@@ -207,6 +207,20 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.7 (2026-04-27)
+
+**Bug fixes:**
+- **Tool call parser routes to wrong tool when AI uses search_documents with filename.** The auto-detect heuristic at line 92 `if "query" in data and "url" not in data` matched FIRST and routed to `web_search`, dropping the `filename` param entirely. Reordered: explicit tool-name prefix check (e.g. `search_documents\n```json{...}```)` runs BEFORE any heuristic. Also added rule: `filename` in JSON ⇒ definitely `search_documents` (web_search has no filename param).
+- **`olyai.sh update` now prints version banner.** Before-and-after version is captured from `/api/v1/admin/version` and shown clearly:
+  ```
+  ===========================================
+    ✓ UPDATE SUCCESS
+      1.3.5  →  1.3.7
+  ===========================================
+  ```
+  Plus partial / failed states with troubleshooting hints.
+- **`/api/v1/admin/version` is now public** (no auth) so the install/update script can read it via `curl` without needing a token.
+
 ### v1.3.6 (2026-04-27)
 
 **Bug fixes:**

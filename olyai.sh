@@ -210,11 +210,27 @@ do_update() {
     echo "============================================"
 
     detect_os
+
+    # Capture BEFORE version (from running service if alive)
+    OLD_VER=$(curl -s --max-time 3 http://localhost:8000/api/v1/admin/version 2>/dev/null \
+              | grep -oE '"current"[^,}]*' | grep -oE '"[0-9.]+"' | tr -d '"' | head -1)
+    [ -z "$OLD_VER" ] && OLD_VER="unknown"
+
+    header "Check remote version"
+    REMOTE_VER=$(curl -s --max-time 5 "$REPO_RAW/VERSION" 2>/dev/null | tr -d '[:space:]')
+    [ -z "$REMOTE_VER" ] && REMOTE_VER="unknown"
+    echo -e "  Current:  ${YELLOW}${OLD_VER}${NC}"
+    echo -e "  Remote:   ${GREEN}${REMOTE_VER}${NC}"
+    if [ "$OLD_VER" = "$REMOTE_VER" ] && [ "$OLD_VER" != "unknown" ]; then
+        warn "Already on latest version ${REMOTE_VER}. Re-installing anyway..."
+    fi
+
     header "Download latest binary"
     curl -fSL "$BINARY_URL" -o "$APP_DIR/olyai-backend.new"
     chmod +x "$APP_DIR/olyai-backend.new"
     mv "$APP_DIR/olyai-backend.new" "$APP_DIR/olyai-backend"
-    log "Binary updated"
+    SIZE=$(du -h "$APP_DIR/olyai-backend" | cut -f1)
+    log "Binary updated ($SIZE)"
 
     run_migrations
 
@@ -227,16 +243,34 @@ do_update() {
         warn "Service failed. Check: journalctl -u olyai -n 30"
     fi
 
-    sleep 1
-    HEALTH=$(curl -s http://localhost:8000/health 2>/dev/null)
-    if echo "$HEALTH" | grep -q "ok"; then
-        log "Health: $HEALTH"
-    else
-        warn "API not ready yet"
-    fi
+    # Wait up to 20s for API
+    NEW_VER="unknown"
+    for i in {1..10}; do
+        sleep 2
+        HEALTH=$(curl -s --max-time 3 http://localhost:8000/health 2>/dev/null)
+        if echo "$HEALTH" | grep -q "ok"; then
+            VER_RESP=$(curl -s --max-time 3 http://localhost:8000/api/v1/admin/version 2>/dev/null)
+            NEW_VER=$(echo "$VER_RESP" | grep -oE '"current"[^,}]*' | grep -oE '"[0-9.]+"' | tr -d '"' | head -1)
+            [ -z "$NEW_VER" ] && NEW_VER="unknown"
+            break
+        fi
+    done
 
     echo ""
-    echo -e "${GREEN}Update complete!${NC}"
+    echo "============================================"
+    if [ "$NEW_VER" = "$REMOTE_VER" ] && [ "$NEW_VER" != "unknown" ]; then
+        echo -e "  ${GREEN}✓ UPDATE SUCCESS${NC}"
+        echo -e "    ${YELLOW}${OLD_VER}${NC}  →  ${GREEN}${NEW_VER}${NC}"
+    elif [ "$NEW_VER" != "unknown" ]; then
+        echo -e "  ${YELLOW}⚠ UPDATE PARTIAL${NC}"
+        echo -e "    Running: ${YELLOW}${NEW_VER}${NC}  (expected ${REMOTE_VER})"
+        echo "    Maybe restart didn't pick up new binary? Try:"
+        echo "      sudo systemctl restart olyai"
+    else
+        echo -e "  ${RED}✗ UPDATE INCOMPLETE${NC} — service not responding"
+        echo "    Check: sudo journalctl -u olyai -n 50 --no-pager"
+    fi
+    echo "============================================"
 }
 
 print_summary() {
