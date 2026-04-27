@@ -207,6 +207,12 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.6 (2026-04-27)
+
+**Bug fixes:**
+- **`search_documents` tool now accepts `filename` filter.** When the user asks "what's in file X?", the AI used to search across all docs and mix unrelated content (e.g. asking about a Tech Payroll XLSX → AI returned Techcombank web search hallucinations). The tool definition now requires `filename` parameter when the user names a specific file. The DB query (both vector + keyword fallback) joins with documents and filters by filename ILIKE.
+- **System prompt anti-hallucination.** Added explicit rules forbidding AI from making up document content when search returns nothing — must say "file not indexed or filename mismatch" instead of pulling content from web search and pretending it's from the file. Also forbids mixing chunks from unrelated files.
+
 ### v1.3.5 (2026-04-27)
 
 **Setup script auto-installs Ollama embedding service.**
