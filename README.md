@@ -201,6 +201,13 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.3 (2026-04-27)
+
+**Bug fixes:**
+- **Upload no longer hangs / "request timed out" when embedding service is dead.** `embed_texts` now uses a 5s connect / 30s read timeout (was 60s default). After the first batch fails, remaining batches are skipped (no point retrying a known-dead server) — a 17MB XLSX with 100 chunks no longer takes `100 × 60s` to fail.
+- **Client upload timeout 60s → 600s.** `URLRequest.timeoutInterval` for `POST /documents/upload` was the system default (60s). Bigger files now have 10 minutes to complete.
+- Silenced openpyxl `UserWarning` about cells marked as date with serial values outside date range — these flooded `journalctl` for every bad cell. Cells are still skipped from text extraction; the file parses.
+
 ### v1.3.2 (2026-04-27)
 
 **Bug fixes:**
