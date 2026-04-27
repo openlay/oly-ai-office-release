@@ -201,6 +201,12 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.2 (2026-04-27)
+
+**Bug fixes:**
+- **`POST /documents/upload` now graceful when embedding service is down.** XLSX/PDF/DOCX uploads no longer 500 (or land status=error) when Ollama embeddings unreachable — file is parsed + chunked + saved with `embedding=NULL` and `error_message` flags the partial state. Same behaviour as the text-create endpoint.
+- **`GET /documents/{id}` returns `context_ids`** — list of contexts the document currently belongs to, so the in-app editor can pre-select Default + any custom contexts when reopening.
+
 ### v1.3.1 (2026-04-27)
 
 **Bug fixes (hotfix v1.3.0):**
