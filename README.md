@@ -201,6 +201,12 @@ Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
 
+### v1.3.4 (2026-04-27)
+
+**Bug fixes:**
+- **AI can now read uploaded files even without embeddings.** When the embedding service is down (no Ollama on AWS) or chunks have `embedding=NULL`, `search_documents` now falls back to **keyword search** (Postgres `ILIKE` with multi-word ranking) instead of returning nothing. AI receives actual chunk content from the document and answers from real data instead of hallucinating "no information available".
+- Last-resort: if no keyword matches anything in the document, return first N chunks anyway so the AI has *something* to read for summary-style questions.
+
 ### v1.3.3 (2026-04-27)
 
 **Bug fixes:**
