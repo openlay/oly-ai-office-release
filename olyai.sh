@@ -211,6 +211,27 @@ do_update() {
 
     detect_os
 
+    # Self-update the script itself first — so users always run the latest
+    # update logic (incl. new banner output, ollama setup, etc.) without
+    # needing to re-curl the script manually.
+    if [ "$OLYAI_SKIP_SELF_UPDATE" != "1" ] && [ -n "${BASH_SOURCE[0]:-}" ]; then
+        SCRIPT_PATH="${BASH_SOURCE[0]}"
+        SCRIPT_REMOTE="$REPO_RAW/olyai.sh"
+        TMP_SCRIPT=$(mktemp)
+        if curl -fsSL "$SCRIPT_REMOTE" -o "$TMP_SCRIPT" 2>/dev/null && [ -s "$TMP_SCRIPT" ]; then
+            # Compare — only re-exec if remote differs from current
+            if ! cmp -s "$TMP_SCRIPT" "$SCRIPT_PATH" 2>/dev/null; then
+                log "Self-updating olyai.sh from remote..."
+                cp "$TMP_SCRIPT" "$SCRIPT_PATH"
+                chmod +x "$SCRIPT_PATH"
+                rm -f "$TMP_SCRIPT"
+                # Re-exec with the new script (set flag to prevent recursion)
+                OLYAI_SKIP_SELF_UPDATE=1 exec bash "$SCRIPT_PATH" update "$@"
+            fi
+            rm -f "$TMP_SCRIPT"
+        fi
+    fi
+
     # Capture BEFORE version (from running service if alive)
     OLD_VER=$(curl -s --max-time 3 http://localhost:8000/api/v1/admin/version 2>/dev/null \
               | grep -oE '"current"[^,}]*' | grep -oE '"[0-9.]+"' | tr -d '"' | head -1)
