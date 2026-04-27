@@ -2,7 +2,28 @@
 
 Internal AI assistant. Backend runs as a **binary** (no Python/pip required). LLM (vLLM) runs on a separate server.
 
-**Current release: v1.2.0** — see [CHANGELOG](#changelog) below.
+**Current release: v1.3.0** — see [CHANGELOG](#changelog) below.
+
+## Downloads
+
+| Artifact | File | Size |
+|---|---|---|
+| Backend (Linux x86_64, systemd) | [`bin/olyai-backend-linux-x86_64`](bin/olyai-backend-linux-x86_64) | ~83 MB |
+| macOS app (Universal: Intel + Apple Silicon) | [`bin/OlyAI-macOS.zip`](bin/OlyAI-macOS.zip) | ~4 MB |
+
+### macOS app — install in 30 seconds
+
+```bash
+# Download + unzip
+curl -fsSL https://raw.githubusercontent.com/openlay/oly-ai-office-release/main/bin/OlyAI-macOS.zip -o OlyAI.zip
+unzip OlyAI.zip -d /Applications/
+xattr -cr /Applications/OlyAI.app    # required: clear quarantine attr from download
+open /Applications/OlyAI.app
+```
+
+If macOS still warns *"App can't be opened because Apple cannot check it"*: System Settings → Privacy & Security → scroll to "OlyAI was blocked..." → **Open Anyway**. After first run, no more prompts.
+
+App runs on: **macOS 14.0+** (Sonoma), Intel + Apple Silicon. Ad-hoc signed (no Apple Developer account needed for end users).
 
 ## Architecture
 
@@ -179,6 +200,26 @@ Internal use only.
 Issues: [GitHub Issues](https://github.com/openlay/oly-ai-office-release/issues)
 
 ## Changelog
+
+### v1.3.0 (2026-04-27)
+
+**New features:**
+- **Document editor in app.** New "Tạo mới (editor)" entry in the Documents menu opens a Markdown editor with toolbar (Bold, Italic, H1-H3, lists, code, links, table template), live split preview, multi-context picker (attach to 1+ contexts), and a "Test Summary" button that previews the AI's understanding before saving.
+- **Edit existing text-authored docs.** Tap a row that was created via the editor to re-open and edit. Backend re-chunks + re-embeds + regenerates summary on save.
+- **App icon.** Added `Assets.xcassets/AppIcon.appiconset` with 22 sizes generated from `icons/ai-ai-svgrepo-com.svg`. Icon shows in Dock, Cmd-Tab switcher, Finder.
+- **macOS app available as binary.** Universal (Intel + Apple Silicon), ad-hoc signed, ships in `bin/OlyAI-macOS.zip`. End users need no Apple Developer account.
+
+**API additions:**
+- `POST   /api/v1/documents/text` — body `{filename, content, context_ids[]}`
+- `PATCH  /api/v1/documents/{id}/text` — partial update; soft-deletes old chunks + re-embeds when content changes
+- `POST   /api/v1/documents/preview-summary` — body `{content}` → AI summary without saving
+
+**Schema:**
+- `documents.raw_content TEXT NULL` — added (auto-migrated via `Base.metadata.create_all` on startup). NULL for uploaded files; Markdown source for text-authored docs.
+
+**Internal:**
+- `apple/Config/Shared.xcconfig` — added `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`
+- `apple/Config/Local.xcconfig.template` — documented Mode A (Apple ID) vs Mode B (no signing) so devs without an Apple Developer account can still open Xcode IDE
 
 ### v1.2.0 (2026-04-20)
 
